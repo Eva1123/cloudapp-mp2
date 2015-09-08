@@ -26,20 +26,51 @@ public class OrphanPages extends Configured implements Tool {
 
     @Override
     public int run(String[] args) throws Exception {
-        //TODO
+    	Job job = Job.getInstance(this.getConf(), "Orphan Pages");
+        job.setOutputKeyClass(IntWritable.class);
+        job.setOutputValueClass(NullWritable.class);
+
+        job.setMapOutputKeyClass(IntWritable.class);
+        job.setMapOutputValueClass(IntWritable.class);
+
+        job.setMapperClass(LinkCountMap.class);
+        job.setReducerClass(LinkCountReduce.class);
+
+        FileInputFormat.setInputPaths(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+        job.setJarByClass(OrphanPages.class);
+        return job.waitForCompletion(true) ? 0 : 1;
     }
 
     public static class LinkCountMap extends Mapper<Object, Text, IntWritable, IntWritable> {
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-            //TODO
+        	String line = value.toString();
+            StringTokenizer tokenizer = new StringTokenizer(line, ": ");
+            int sourceID = Integer.parseInt(tokenizer.nextToken());
+            while (tokenizer.hasMoreTokens())
+            {
+            	int destID = Integer.parseInt(tokenizer.nextToken());
+            	context.write(new IntWritable(destID), new IntWritable(sourceID));
+            }
+            context.write(new IntWritable(sourceID), new IntWritable(0)); // assume valid page ID starts from 1
         }
     }
 
     public static class OrphanPageReduce extends Reducer<IntWritable, IntWritable, IntWritable, NullWritable> {
         @Override
         public void reduce(IntWritable key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-            //TODO
+        	int sum = 0; int cnt = 0;
+            for (IntWritable val : values)
+            {
+            	sum += val.get();
+            	cnt ++;
+            }
+            if (sum == 0 && cnt == 1)
+            {
+            	context.write(key, NullWritable.get());
+            }
         }
     }
 }
